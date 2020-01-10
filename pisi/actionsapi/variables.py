@@ -14,7 +14,6 @@ import os
 
 # Pisi-Core Modules
 import pisi.context as ctx
-import pisi.util
 
 # Set individual information, that are generally needed for ActionsAPI
 
@@ -28,7 +27,7 @@ def exportFlags():
     # Build systems depend on these environment variables. That is why
     # we export them instead of using as (instance) variables.
     values = ctx.config.values
-    os.environ['HOST'] =  values.build.host
+    os.environ['HOST'] = values.build.host
     os.environ['CFLAGS'] = values.build.cflags
     os.environ['CXXFLAGS'] = values.build.cxxflags
     os.environ['LDFLAGS'] = values.build.ldflags
@@ -36,9 +35,8 @@ def exportFlags():
     os.environ['JOBS'] = values.build.jobs
 
     # http://liste.pardus.org.tr/gelistirici/2009-January/016442.html
-    os.environ['CC'] = values.build.cc
-    os.environ['CXX'] = values.build.cxx
-    os.environ['LD'] = values.build.ld
+    os.environ['CC'] = "%s-gcc" % values.build.host
+    os.environ['CXX'] = "%s-g++" % values.build.host
 
 class Env(object):
     '''General environment variables used in actions API'''
@@ -65,7 +63,7 @@ class Env(object):
 
         # Using environment variables is somewhat tricky. Each time
         # you need them you need to check for their value.
-        if self.__vars.has_key(attr):
+        if attr in self.__vars:
             return os.getenv(self.__vars[attr])
         else:
             return None
@@ -83,6 +81,7 @@ class Dirs:
     localstate = 'var'
     libexec = 'usr/libexec'
     defaultprefix = 'usr'
+    emul32prefix = 'emul32'
 
     # These should be owned by object not the class. Or else Python
     # will bug us with NoneType errors because of uninitialized

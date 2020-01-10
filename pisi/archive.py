@@ -19,10 +19,11 @@ import errno
 import shutil
 import tarfile
 import zipfile
+import lzma
 
 import gettext
 __trans = gettext.translation('pisi', fallback=True)
-_ = __trans.ugettext
+_ = __trans.gettext
 
 # PiSi modules
 import pisi
@@ -73,7 +74,7 @@ class _LZMAProxy(object):
                 break
             b.append(data)
             x += len(data)
-        self.buf = "".join(b)
+        self.buf = b"".join([b_item if type(b_item) == bytes else b_item.encode() for b_item in b])
 
         buf = self.buf[:size]
         self.buf = self.buf[size:]
@@ -106,7 +107,7 @@ class TarFile(tarfile.TarFile):
                  name=None,
                  mode="r",
                  fileobj=None,
-                 compressformat="xz",
+                 compressformat=lzma.FORMAT_XZ,
                  compresslevel=9,
                  **kwargs):
         """Open lzma/xz compressed tar archive name for reading or writing.
@@ -126,12 +127,12 @@ class TarFile(tarfile.TarFile):
         else:
             options = {"format":    compressformat,
                        "level":     compresslevel}
-            fileobj = lzma.LZMAFile(name, mode, options=options)
+            fileobj = lzma.LZMAFile(name, mode, format=1)
 
         try:
             t = cls.taropen(name, mode, fileobj, **kwargs)
         except IOError:
-            raise ReadError("not a lzma file")
+            raise tarfile.ReadError("not a lzma file")
         t._extfileobj = False
         return t
 
@@ -186,7 +187,7 @@ class ArchiveBzip2(ArchiveBase):
         import bz2
         bz2_file = bz2.BZ2File(self.file_path, "r")
         output = open(output_path, "w")
-        output.write(bz2_file.read())
+        output.write(bz2_file.read().decode())
         output.close()
         bz2_file.close()
 
@@ -212,7 +213,7 @@ class ArchiveGzip(ArchiveBase):
         import gzip
         gzip_file = gzip.GzipFile(self.file_path, "r")
         output = open(output_path, "w")
-        output.write(gzip_file.read())
+        output.write(gzip_file.read().decode())
         output.close()
         gzip_file.close()
 
@@ -239,7 +240,7 @@ class ArchiveLzma(ArchiveBase):
         import lzma
         lzma_file = lzma.LZMAFile(self.file_path, "r")
         output = open(output_path, "w")
-        output.write(lzma_file.read())
+        output.write(lzma_file.read().decode())
         output.close()
         lzma_file.close()
 
@@ -339,7 +340,7 @@ class ArchiveTar(ArchiveBase):
 
             try:
                 self.tar.extract(tarinfo)
-            except OSError, e:
+            except OSError as e:
                 # Handle the case where an upper directory cannot
                 # be created because of a conflict with an existing
                 # regular file or symlink. In this case, remove
@@ -496,6 +497,7 @@ class ArchiveTarZ(ArchiveBase):
             pass
         self.tar.close()
 
+
 class Archive7Zip(ArchiveBase):
     """Archive7Zip handles 7-Zip archives."""
 
@@ -545,7 +547,7 @@ class ArchiveZip(ArchiveBase):
             arc_name = arc_name or ""
             self.zip_obj.writestr(arc_name + '/', '')
             attr_obj = self.zip_obj.getinfo(arc_name + '/')
-            attr_obj.external_attr = stat.S_IMODE(os.stat(file_name)[0]) << 16L
+            attr_obj.external_attr = stat.S_IMODE(os.stat(file_name)[0]) << 16
             for f in os.listdir(file_name):
                 self.add_to_archive(os.path.join(file_name, f),
                                     os.path.join(arc_name, f))

@@ -16,7 +16,7 @@ import string
 
 import gettext
 __trans = gettext.translation('pisi', fallback=True)
-_ = __trans.ugettext
+_ = __trans.gettext
 
 import pisi
 import pisi.context as ctx
@@ -36,8 +36,9 @@ def is_char_valid(char):
 
 def is_method_missing(exception):
     """Tells if exception is about missing method in COMAR script"""
-    if exception._dbus_error_name in ("tr.org.pardus.comar.python.missing",
-                                      "tr.org.pardus.comar.Missing"):
+    if exception.get_dbus_name() in ("tr.org.pardus.comar.python.missing", "tr.org.pardus.comar.Missing"):
+        return True
+    if exception.__context__.get_dbus_name() in ("tr.org.pardus.comar.python.missing", "tr.org.pardus.comar.Missing"):
         return True
     return False
 
@@ -79,9 +80,9 @@ def get_link():
             link = comar.Link(socket=sockname, alternate=alternate)
             link.setLocale()
             return link
-        except dbus.DBusException, e:
+        except dbus.DBusException as e:
             exceptions.append(str(e))
-        except Exception, e:
+        except Exception as e:
             exceptions.append(str(e))
         time.sleep(0.2)
         timeout -= 0.2
@@ -115,12 +116,12 @@ def post_install(package_name, provided_scripts,
         try:
             link.register(script_name, script.om,
                           os.path.join(scriptpath, script.script))
-        except dbus.DBusException, exception:
+        except dbus.DBusException as exception:
             raise Error(_("Script error: %s") % exception)
         if script.om == "System.Service":
             try:
                 link.System.Service[script_name].registerState()
-            except dbus.DBusException, exception:
+            except dbus.DBusException as exception:
                 raise Error(_("Script error: %s") % exception)
 
     ctx.ui.debug(_("Calling post install handlers"))
@@ -130,7 +131,7 @@ def post_install(package_name, provided_scripts,
                     metapath,
                     filepath,
                     timeout=ctx.dbus_timeout)
-        except dbus.DBusException, exception:
+        except dbus.DBusException as exception:
             # Do nothing if setupPackage method is not defined
             # in package script
             if not is_method_missing(exception):
@@ -147,7 +148,7 @@ def post_install(package_name, provided_scripts,
             link.System.Package[package_name].postInstall(
                     fromVersion, fromRelease, toVersion, toRelease,
                     timeout=ctx.dbus_timeout)
-        except dbus.DBusException, exception:
+        except dbus.DBusException as exception:
             # Do nothing if postInstall method is not defined in package script
             if not is_method_missing(exception):
                 raise Error(_("Script error: %s") % exception)
@@ -166,7 +167,7 @@ def pre_remove(package_name, metapath, filepath):
         try:
             link.System.Package[package_name].preRemove(
                     timeout=ctx.dbus_timeout)
-        except dbus.DBusException, exception:
+        except dbus.DBusException as exception:
             # Do nothing if preRemove method is not defined in package script
             if not is_method_missing(exception):
                 raise Error(_("Script error: %s") % exception)
@@ -176,7 +177,7 @@ def pre_remove(package_name, metapath, filepath):
         try:
             link.System.PackageHandler[handler].cleanupPackage(
                     metapath, filepath, timeout=ctx.dbus_timeout)
-        except dbus.DBusException, exception:
+        except dbus.DBusException as exception:
             # Do nothing if cleanupPackage method is not defined
             # in package script
             if not is_method_missing(exception):
@@ -199,7 +200,7 @@ def post_remove(package_name, metapath, filepath, provided_scripts=[]):
         try:
             link.System.Package[package_name].postRemove(
                     timeout=ctx.dbus_timeout)
-        except dbus.DBusException, exception:
+        except dbus.DBusException as exception:
             # Do nothing if postRemove method is not defined in package script
             if not is_method_missing(exception):
                 raise Error(_("Script error: %s") % exception)
@@ -209,7 +210,7 @@ def post_remove(package_name, metapath, filepath, provided_scripts=[]):
         try:
             link.System.PackageHandler[handler].postCleanupPackage(
                     metapath, filepath, timeout=ctx.dbus_timeout)
-        except dbus.DBusException, exception:
+        except dbus.DBusException as exception:
             # Do nothing if postCleanupPackage method is not defined
             # in package script
             if not is_method_missing(exception):
@@ -219,5 +220,5 @@ def post_remove(package_name, metapath, filepath, provided_scripts=[]):
     for scr in scripts:
         try:
             link.remove(scr, timeout=ctx.dbus_timeout)
-        except dbus.DBusException, exception:
+        except dbus.DBusException as exception:
             raise Error(_("Script error: %s") % exception)

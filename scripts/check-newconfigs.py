@@ -12,7 +12,6 @@
 
 import os
 import sys
-import exceptions
 
 import pisi
 
@@ -20,7 +19,7 @@ installdb = pisi.db.installdb.InstallDB()
 
 def ask_action(msg, actions, default):
     while True:
-        s = raw_input(msg)
+        s = eval(input(msg))
         if len(s) == 0:
             return default
         else:
@@ -35,8 +34,8 @@ def get_installed_packages():
 def check_changed_config_files(package):
     
     all_files = installdb.get_files(package)
-    config_files = filter(lambda x: x.type == 'config', all_files.list)
-    config_paths = map(lambda x: "/" + str(x.path), config_files)
+    config_files = [x for x in all_files.list if x.type == 'config']
+    config_paths = ["/" + str(x.path) for x in config_files]
 
     newconfig = [] 
     for path in config_paths:
@@ -63,22 +62,25 @@ def show_changes(package, changed):
             if answer == "?":
                 os.system("diff -u %s %s | less" % (file, file + ".newconfig"))
 
+
 def check_package(package):
     changed = check_changed_config_files(package)
     if changed:
         show_changes(package, changed)
+
 
 def check_changes():
     packages = get_installed_packages()
     for pkg in packages:
         check_package(pkg)
 
+
 if __name__ == "__main__":
-     if len(sys.argv) == 1:
-         print "Checking all packages"
-         check_changes()
-     if len(sys.argv) == 2:
-         check_package(sys.argv[1])
-     if len(sys.argv) > 2:
-         for pkg in sys.argv[1:]:
-             check_package(pkg)
+    if len(sys.argv) == 1:
+        print("Checking all packages")
+        check_changes()
+    if len(sys.argv) == 2:
+        check_package(sys.argv[1])
+    if len(sys.argv) > 2:
+        for pkg in sys.argv[1:]:
+            check_package(pkg)

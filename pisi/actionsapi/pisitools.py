@@ -22,7 +22,7 @@ import filecmp
 
 import gettext
 __trans = gettext.translation('pisi', fallback=True)
-_ = __trans.ugettext
+_ = __trans.gettext
 
 # Pisi Modules
 import pisi.context as ctx
@@ -98,7 +98,7 @@ def dolib(sourceFile, destinationDirectory = '/usr/lib'):
     sourceFile = join_path(os.getcwd(), sourceFile)
     destinationDirectory = join_path(get.installDIR(), destinationDirectory)
 
-    lib_insinto(sourceFile, destinationDirectory, 0755)
+    lib_insinto(sourceFile, destinationDirectory, 0o755)
 
 def dolib_a(sourceFile, destinationDirectory = '/usr/lib'):
     '''insert the static library into /usr/lib with permission 0644'''
@@ -107,7 +107,7 @@ def dolib_a(sourceFile, destinationDirectory = '/usr/lib'):
     sourceFile = join_path(os.getcwd(), sourceFile)
     destinationDirectory = join_path(get.installDIR(), destinationDirectory)
 
-    lib_insinto(sourceFile, destinationDirectory, 0644)
+    lib_insinto(sourceFile, destinationDirectory, 0o644)
 
 def dolib_so(sourceFile, destinationDirectory = '/usr/lib'):
     '''insert the dynamic library into /usr/lib with permission 0755'''
@@ -116,7 +116,7 @@ def dolib_so(sourceFile, destinationDirectory = '/usr/lib'):
     sourceFile = join_path(os.getcwd(), sourceFile)
     destinationDirectory = join_path(get.installDIR(), destinationDirectory)
 
-    lib_insinto(sourceFile, destinationDirectory, 0755)
+    lib_insinto(sourceFile, destinationDirectory, 0o755)
 
 def doman(*sourceFiles):
     '''inserts the man pages in the list of files into /usr/share/man/'''
@@ -184,7 +184,7 @@ def rename(sourceFile, destinationFile):
 
     try:
         os.rename(join_path(get.installDIR(), sourceFile), join_path(get.installDIR(), baseDir, destinationFile))
-    except OSError, e:
+    except OSError as e:
         error(_('ActionsAPI [rename]: %s: %s') % (e, sourceFile))
 
 def dosed(sourceFiles, findPattern, replacePattern = ''):
@@ -205,8 +205,8 @@ def dosed(sourceFiles, findPattern, replacePattern = ''):
     for sourceFile in sourceFilesGlob:
         if can_access_file(sourceFile):
             backupFile = "%s%s" % (sourceFile, backupExtension)
-            for line in fileinput.input(sourceFile, inplace = 1, backup = backupExtension):
-                #FIXME: In-place filtering is disabled when standard input is read
+            for line in fileinput.input(sourceFile, inplace=1, backup=backupExtension):
+                # FIXME: In-place filtering is disabled when standard input is read
                 line = re.sub(findPattern, replacePattern, line)
                 sys.stdout.write(line)
             if can_access_file(backupFile):
@@ -282,3 +282,34 @@ def removeDir(destinationDirectory):
 
     for directory in destdirGlob:
         unlinkDir(directory)
+
+
+class Flags:
+    def __init__(self, *evars):
+        self.evars = evars
+
+    def add(self, *flags):
+        for evar in self.evars:
+            os.environ[evar] = " ".join(os.environ[evar].split() + [f.strip() for f in flags])
+
+    def remove(self, *flags):
+        for evar in self.evars:
+            os.environ[evar] = " ".join([v for v in os.environ[evar].split() if v not in [f.strip() for f in flags]])
+
+    def replace(self, old_val, new_val):
+        for evar in self.evars:
+            os.environ[evar] = " ".join([new_val if v == old_val else v for v in os.environ[evar].split()])
+
+    def sub(self, pattern, repl, count=0, flags=0):
+        for evar in self.evars:
+            os.environ[evar] = re.sub(pattern, repl, os.environ[evar], count, flags)
+
+    def reset(self):
+        for evar in self.evars:
+            os.environ[evar] = ""
+
+
+cflags = Flags("CFLAGS")
+ldflags = Flags("LDFLAGS")
+cxxflags = Flags("CXXFLAGS")
+flags = Flags("CFLAGS", "CXXFLAGS")

@@ -17,7 +17,7 @@ import os
 import re
 import gettext
 __trans = gettext.translation('pisi', fallback=True)
-_ = __trans.ugettext
+_ = __trans.gettext
 
 import piksemel
 
@@ -67,13 +67,22 @@ class InstallDB(lazydb.LazyDB):
     def init(self):
         self.installed_db = self.__generate_installed_pkgs()
         self.rev_deps_db = self.__generate_revdeps()
+        self.installed_extra = self.__generate_installed_extra()
+
+    def __generate_installed_extra(self):
+        ie = []
+        ie_path = os.path.join(ctx.config.info_dir(), ctx.const.installed_extra)
+        if os.path.isfile(ie_path):
+             with open(ie_path) as ie_file:
+                 ie.extend(ie_file.read().strip().split("\n"))
+        return ie
 
     def __generate_installed_pkgs(self):
         def split_name(dirname):
             name, version, release = dirname.rsplit("-", 2)
             return name, version + "-" + release
 
-        return dict(map(split_name, os.listdir(ctx.config.packages_dir())))
+        return dict(list(map(split_name, os.listdir(ctx.config.packages_dir()))))
 
     def __get_marked_packages(self, _type):
         info_path = os.path.join(ctx.config.info_dir(), _type)
@@ -113,10 +122,10 @@ class InstallDB(lazydb.LazyDB):
         return revdeps
 
     def list_installed(self):
-        return self.installed_db.keys()
+        return list(self.installed_db.keys())
 
     def has_package(self, package):
-        return self.installed_db.has_key(package)
+        return package in self.installed_db
 
     def list_installed_with_build_host(self, build_host):
         build_host_re = re.compile("<BuildHost>(.*?)</BuildHost>")
@@ -166,7 +175,7 @@ class InstallDB(lazydb.LazyDB):
 
     def get_config_files(self, package):
         files = self.get_files(package)
-        return filter(lambda x: x.type == 'config', files.list)
+        return [x for x in files.list if x.type == 'config']
 
     def search_package(self, terms, lang=None, fields=None):
         """
@@ -187,12 +196,12 @@ class InstallDB(lazydb.LazyDB):
         found = []
         for name in self.list_installed():
             xml = open(os.path.join(self.package_path(name), ctx.const.metadata_xml)).read()
-            if terms == filter(lambda term: (fields['name'] and \
+            if terms == [term for term in terms if (fields['name'] and \
                     re.compile(term, re.I).search(name)) or \
                     (fields['summary'] and \
                     re.compile(resum % (lang, term), re.I).search(xml)) or \
                     (fields['desc'] and \
-                    re.compile(redesc % (lang, term), re.I).search(xml)), terms):
+                    re.compile(redesc % (lang, term), re.I).search(xml))]:
                 found.append(name)
         return found
 
@@ -243,11 +252,24 @@ class InstallDB(lazydb.LazyDB):
 
         package_revdeps = self.rev_deps_db.get(name)
         if package_revdeps:
-            for pkg, dep in package_revdeps.items():
+            for pkg, dep in list(package_revdeps.items()):
                 dependency = self.__create_dependency(dep)
                 rev_deps.append((pkg, dependency))
 
         return rev_deps
+
+    def get_orphaned(self):
+        """
+        get list of packages installed as extra dependency,
+        but without reverse dependencies now.
+        """
+        return [x for x in self.installed_extra if not self.get_rev_deps(x)]
+
+    def get_no_rev_deps(self):
+        """
+        get installed packages list which haven't reverse dependencies.
+        """
+        return [x for x in self.installed_db if not self.get_rev_deps(x)]
 
     def pkg_dir(self, pkg, version, release):
         return pisi.util.join_path(ctx.config.packages_dir(), pkg + '-' + version + '-' + release)
@@ -275,7 +297,7 @@ class InstallDB(lazydb.LazyDB):
 
     def add_package(self, pkginfo):
         # Cleanup old revdep info
-        for revdep_info in self.rev_deps_db.values():
+        for revdep_info in list(self.rev_deps_db.values()):
             if pkginfo.name in revdep_info:
                 del revdep_info[pkginfo.name]
 
@@ -283,11 +305,11 @@ class InstallDB(lazydb.LazyDB):
         self.__add_to_revdeps(pkginfo.name, self.rev_deps_db)
 
     def remove_package(self, package_name):
-        if self.installed_db.has_key(package_name):
+        if package_name in self.installed_db:
             del self.installed_db[package_name]
 
         # Cleanup revdep info
-        for revdep_info in self.rev_deps_db.values():
+        for revdep_info in list(self.rev_deps_db.values()):
             if package_name in revdep_info:
                 del revdep_info[package_name]
 
@@ -329,7 +351,7 @@ class InstallDB(lazydb.LazyDB):
 
     def package_path(self, package):
 
-        if self.installed_db.has_key(package):
+        if package in self.installed_db:
             return os.path.join(ctx.config.packages_dir(), "%s-%s" % (package, self.installed_db[package]))
 
         raise Exception(_('Package %s is not installed') % package)
